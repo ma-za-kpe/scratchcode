@@ -11,9 +11,7 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageCapture
-import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.*
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -36,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.google.mlkit.vision.common.InputImage
+import com.maku.scratchcode.ui.helper.detectRectangle
 import com.maku.scratchcode.ui.helper.getCameraProvider
 import com.maku.scratchcode.ui.helper.runTextRecognition
 import com.maku.scratchcode.ui.helper.takePhoto
@@ -48,6 +48,9 @@ import java.util.concurrent.Executors
 import androidx.camera.core.Preview as Pr
 
 
+typealias mlListener = (ml: ImageProxy) -> Unit
+
+@androidx.camera.core.ExperimentalGetImage
 class MainActivity : ComponentActivity() {
     private lateinit var outputDirectory: File
     private lateinit var cameraExecutor: ExecutorService
@@ -110,8 +113,9 @@ class MainActivity : ComponentActivity() {
         Log.i("Scratch", "Image captured: $uri")
         shouldShowCamera.value = false
         shouldShowProcessing.value = true
-        val bitmap: Bitmap = MediaStore.Images.Media.getBitmap(this.contentResolver, Uri.parse(uri.toString()));
-        runTextRecognition(bitmap, shouldShowProcessing)
+        val bitmap: Bitmap =
+            MediaStore.Images.Media.getBitmap(this.contentResolver, Uri.parse(uri.toString()));
+        // runTextRecognition(bitmap, shouldShowProcessing)
     }
 
     private fun getOutputDirectory(): File {
@@ -128,6 +132,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@androidx.camera.core.ExperimentalGetImage
 @Composable
 fun CameraView(
     outputDirectory: File,
@@ -147,6 +152,26 @@ fun CameraView(
     val cameraSelector = CameraSelector.Builder()
         .requireLensFacing(lensFacing)
         .build()
+    val imageAnalyzer = remember {
+        ImageAnalysis.Builder()
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .build()
+            .also {
+                it.setAnalyzer(executor, ScratchImageAnalyzer { imageProxy ->
+
+                    val mediaImage = imageProxy.image
+                    if (mediaImage != null) {
+                        val image = InputImage.fromMediaImage(
+                            mediaImage,
+                            imageProxy.imageInfo.rotationDegrees
+                        )
+                        // Pass image to an ML Kit Vision API
+                        detectRectangle(image, shouldShowProcessing, imageProxy)
+                        // runTextRecognition(image, shouldShowProcessing, imageProxy)
+                    }
+                })
+            }
+    }
 
     LaunchedEffect(lensFacing) {
         val cameraProvider = context.getCameraProvider()
@@ -155,7 +180,8 @@ fun CameraView(
             lifecycleOwner,
             cameraSelector,
             preview,
-            imageCapture
+            imageCapture,
+            imageAnalyzer
         )
 
         preview.setSurfaceProvider(previewView.surfaceProvider)
@@ -190,6 +216,13 @@ fun CameraView(
                 )
             }
         )
+    }
+}
+
+@androidx.camera.core.ExperimentalGetImage
+private class ScratchImageAnalyzer(private val listener: mlListener) : ImageAnalysis.Analyzer {
+    override fun analyze(imageProxy: ImageProxy) {
+        listener(imageProxy)
     }
 }
 

@@ -74,13 +74,15 @@ fun ScratchCodeApp(
                 AnimatedVisibility(
                     visible = shouldShowProcessing.value,
                 ) {
-                    Row(  verticalAlignment = Alignment.CenterVertically,
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .wrapContentHeight()
                             .fillMaxWidth()
                             .background(MaterialTheme.colorScheme.background)
                             .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,) {
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
                         Text(
                             text = "Processing ...",
                             fontSize = 24.sp,
@@ -92,10 +94,12 @@ fun ScratchCodeApp(
                         ) {
                             val loadingContentDescription = stringResource(R.string.app_name)
                             Box(
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.size(70.dp)
                             ) {
                                 OverlayLoadingWheel(
-                                    modifier = Modifier.align(Alignment.Center).size(70.dp)
+                                    modifier = Modifier
+                                        .align(Alignment.Center)
+                                        .size(70.dp)
                                         .padding(5.dp),
                                     contentDesc = loadingContentDescription
                                 )
@@ -143,7 +147,7 @@ fun ListRow(model: ScratchEntity) {
 @Composable
 fun ScratchCodeAppPreview() {
     val shouldShowCamera: MutableState<Boolean> = mutableStateOf(false)
-    val shouldShowProcessing: MutableState<Boolean> = mutableStateOf(false)
+    val shouldShowProcessing: MutableState<Boolean> = mutableStateOf(true)
 
     ScratchCodeApp(shouldShowCamera, shouldShowProcessing)
 }
