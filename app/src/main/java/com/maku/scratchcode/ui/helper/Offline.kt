@@ -3,6 +3,7 @@ package com.maku.scratchcode.ui.helper
 import android.util.Log
 import androidx.camera.core.ImageProxy
 import androidx.compose.runtime.MutableState
+import androidx.lifecycle.MutableLiveData
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.objects.DetectedObject
 import com.google.mlkit.vision.objects.ObjectDetection
@@ -10,29 +11,6 @@ import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-
-fun detectRectangle(
-    image: InputImage,
-    shouldShowProcessing: MutableState<Boolean>,
-    imageProxy: ImageProxy
-) {
-    val options = ObjectDetectorOptions.Builder()
-        .setDetectorMode(ObjectDetectorOptions.SINGLE_IMAGE_MODE)
-        .enableMultipleObjects()
-        .enableClassification()
-        .build()
-    val objectDetector = ObjectDetection.getClient(options)
-
-    objectDetector.process(image)
-        .addOnSuccessListener {
-            // Task completed successfully
-            debugPrint(it)
-        }
-        .addOnFailureListener {
-            // Task failed with an exception
-            Log.e("TAG", it.message.toString())
-        }
-}
 
 private fun debugPrint(detectedObjects: List<DetectedObject>) {
     detectedObjects.forEachIndexed { index, detectedObject ->
@@ -162,6 +140,5 @@ fun processRaywenderlichTxt(text: Text) {
             }
         }
     }
-
 }
 

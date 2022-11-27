@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">ScratchCode</string>
+    <string name="overlay_help">Center text in box</string>
 </resources>
