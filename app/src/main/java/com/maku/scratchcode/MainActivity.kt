@@ -7,7 +7,6 @@ import android.graphics.*
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
-import android.util.DisplayMetrics
 import android.util.Log
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -44,6 +43,7 @@ import com.maku.scratchcode.ui.helper.takePhoto
 import com.maku.scratchcode.ui.screen.ScratchCodeApp
 import com.maku.scratchcode.ui.theme.ScratchCodeTheme
 import com.maku.scratchcode.ui.vm.MainViewModel
+import org.opencv.android.OpenCVLoader
 import java.io.File
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
@@ -93,7 +93,14 @@ class MainActivity : ComponentActivity() {
         val root = layoutInflater.inflate(R.layout.overlay, null)
         overlay = root.findViewById(R.id.overlay)
 
+        if (!OpenCVLoader.initDebug())
+            Log.e("OpenCV", "Unable to load OpenCV!");
+        else
+            Log.d("OpenCV", "OpenCV loaded Successfully!");
+
         setContent {
+            val bitmap = remember { mutableStateOf<Bitmap?>(null) }
+
             ScratchCodeTheme {
                 if (shouldShowCamera.value) {
                     CameraView(
@@ -103,10 +110,11 @@ class MainActivity : ComponentActivity() {
                         onError = { Log.e("Scratch", "View error:", it) },
                         shouldShowProcessing,
                         overlay,
-                        viewModel.imageCropPercentages
+                        viewModel.imageCropPercentages,
+                        bitmap
                     )
                 } else {
-                    ScratchCodeApp(shouldShowCamera, shouldShowProcessing)
+                    ScratchCodeApp(shouldShowCamera, shouldShowProcessing, bitmap)
                 }
             }
         }
@@ -165,7 +173,8 @@ fun CameraView(
     onError: (ImageCaptureException) -> Unit,
     shouldShowProcessing: MutableState<Boolean>,
     overlay: SurfaceView,
-    imageCropPercentages: MutableLiveData<Pair<Int, Int>>
+    imageCropPercentages: MutableLiveData<Pair<Int, Int>>,
+    bitmap: MutableState<Bitmap?>
 ) {
 
     val lensFacing = CameraSelector.LENS_FACING_BACK
@@ -195,7 +204,7 @@ fun CameraView(
             .also {
                 it.setAnalyzer(
                     executor,
-                    TextAnalyzer(shouldShowProcessing, imageCropPercentages)
+                    TextAnalyzer(shouldShowProcessing, imageCropPercentages, bitmap)
                 )
             }
     }
@@ -397,6 +406,7 @@ private fun drawOverlay(
 fun ScratchCodeAppPreview() {
     val shouldShowCamera: MutableState<Boolean> = mutableStateOf(false)
     val shouldShowProcessing: MutableState<Boolean> = mutableStateOf(false)
+    val bitmap = remember { mutableStateOf<Bitmap?>(null) }
 
-    ScratchCodeApp(shouldShowCamera, shouldShowProcessing)
+    ScratchCodeApp(shouldShowCamera, shouldShowProcessing, bitmap)
 }

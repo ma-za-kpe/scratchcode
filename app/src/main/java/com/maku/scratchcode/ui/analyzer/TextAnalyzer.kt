@@ -1,5 +1,7 @@
 package com.maku.scratchcode.ui.analyzer
 
+import android.graphics.Bitmap
+import android.graphics.Bitmap.CompressFormat
 import android.graphics.Rect
 import android.util.Log
 import androidx.camera.core.ImageAnalysis
@@ -12,6 +14,10 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import org.opencv.android.Utils
+import org.opencv.core.*
+import org.opencv.imgproc.Imgproc
+
 
 /**
  * Analyzes the frames passed in from the camera and returns any detected text within the requested
@@ -19,7 +25,8 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
  */
 class TextAnalyzer(
     private val shouldShowProcessing: MutableState<Boolean>,
-    private val imageCropPercentages: MutableLiveData<Pair<Int, Int>>
+    private val imageCropPercentages: MutableLiveData<Pair<Int, Int>>,
+    private val bitmap: MutableState<Bitmap?>
 ) : ImageAnalysis.Analyzer {
 
     val recognizer: com.google.mlkit.vision.text.TextRecognizer =
@@ -69,9 +76,190 @@ class TextAnalyzer(
             (imageHeight * heightCrop / 2).toInt()
         )
         val croppedBitmap = ImageUtils.rotateAndCrop(convertImageToBitmap, rotationDegrees, cropRect)
-        recognizeTextOnDevice(InputImage.fromBitmap(croppedBitmap, 0), shouldShowProcessing).addOnCompleteListener {
-            imageProxy.close()
+        bitmap.value = croppedBitmap
+        // pass the cropped bitmap to open cv then pass to firebase ML
+//         doImagePrep(croppedBitmap, bitmap, shouldShowProcessing)
+//        openCv(croppedBitmap, bitmap, shouldShowProcessing)
+//        findLargestRectangle(croppedBitmap, bitmap, shouldShowProcessing)
+//        recognizeTextOnDevice(InputImage.fromBitmap(croppedBitmap, 0), shouldShowProcessing).addOnCompleteListener {
+//            imageProxy.close()
+//        }
+    }
+
+    private fun doImagePrep(
+        croppedBitmap: Bitmap,
+        bitmap: MutableState<Bitmap?>,
+        shouldShowProcessing: MutableState<Boolean>
+    ) {
+        val original = toMat(croppedBitmap)
+        val gray8 = Mat(toMat(croppedBitmap).size(), CvType.CV_8UC1)
+        Imgproc.cvtColor(toMat(croppedBitmap), gray8, Imgproc.COLOR_RGB2GRAY)
+        bitmap.value = toBitmap(gray8)
+    }
+
+    private fun openCv(
+        croppedBitmap: Bitmap,
+        bitmap: MutableState<Bitmap?>,
+        shouldShowProcessing: MutableState<Boolean>
+    ) {
+        val original = toMat(croppedBitmap)
+        val gray8 = Mat(toMat(croppedBitmap).size(), CvType.CV_8UC1)
+        Imgproc.cvtColor(toMat(croppedBitmap), gray8, Imgproc.COLOR_RGB2GRAY)
+        bitmap.value = toBitmap(gray8)
+//        val mean = Core.mean(gray8)
+//        Imgproc.threshold(
+//            gray8, gray8, mean.`val`[0], 255.0,
+//            Imgproc.THRESH_BINARY
+//        )
+//        /*Imgproc.erode(gray8, gray8, new Mat(), new Point(-1, -1), 2);*/
+//        /*Imgproc.erode(gray8, gray8, new Mat(), new Point(-1, -1), 2);*/
+//        val contours: List<MatOfPoint> = ArrayList()
+//        val hierarchy = MatOfInt4()
+//        Imgproc.findContours(
+//            gray8, contours, hierarchy,
+//            Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE
+//        )
+////        Toast.makeText(
+////            getApplicationContext(),
+////            contours.size.toString() + " yo",
+////            Toast.LENGTH_SHORT
+////        ).show()
+//        for (contourIdx in contours.indices) {
+//            Imgproc.drawContours(
+//                original,
+//                contours,
+//                contourIdx,
+//                Scalar(0.0, 0.0, 255.0),
+//                -1,
+//                1,
+//                hierarchy,
+//                50,
+//                Point(1.0, 1.0)
+//            )
+//        }
+//        gray8.convertTo(gray8, CvType.CV_32S)
+////        Imgproc.watershed(original, gray8)
+////        gray8.convertTo(gray8, CvType.CV_8UC1)
+//        bitmap.value = toBitmap(gray8)
+    }
+
+    private fun findLargestRectangle(
+        croppedBitmap: Bitmap,
+        bitmap: MutableState<Bitmap?>,
+        shouldShowProcessing: MutableState<Boolean>
+    ) {
+        val original_image = toMat(croppedBitmap)
+        val bmpOriOut = Bitmap.createBitmap(
+            original_image.cols(),
+            original_image.rows(),
+            Bitmap.Config.ARGB_8888
+        )
+        Utils.matToBitmap(original_image, bmpOriOut)
+
+        // convert the image to black and white,
+        Imgproc.cvtColor(original_image, original_image, Imgproc.COLOR_BGR2RGB)
+        bitmap.value = toBitmap(original_image)
+
+//         convert the image to black and white does (8 bit),
+//        Imgproc.Canny(original_image, original_image, 50.0, 50.0)
+
+//        //apply gaussian blur to smoothen lines of dots, commenting this crashes
+//        Imgproc.GaussianBlur(original_image, original_image, Size(5.0, 5.0), 5.0)
+//
+//        //find the contours
+//        val contours: List<MatOfPoint> = ArrayList()
+//        Imgproc.findContours(
+//            original_image,
+//            contours,
+//            Mat(),
+//            Imgproc.RETR_LIST,
+//            Imgproc.CHAIN_APPROX_SIMPLE
+//        )
+//        var maxArea = -1.0
+//        var maxAreaIdx = -1
+//        var temp_contour = contours[0] //the largest is at the index 0 for starting point
+//        val approxCurve = MatOfPoint2f()
+//        var largest_contour: Mat = contours[0]
+//        var largest_contours: MutableList<MatOfPoint?> = ArrayList()
+//        for (idx in contours.indices) {
+//            temp_contour = contours[idx]
+//            val contourarea = Imgproc.contourArea(temp_contour)
+//            //compare this contour to the previous largest contour found
+//            if (contourarea > maxArea) {
+//                //check if this contour is a square
+//                val new_mat = MatOfPoint2f(*temp_contour.toArray())
+//                val contourSize = temp_contour.total().toInt()
+//                Imgproc.approxPolyDP(new_mat, approxCurve, contourSize * 0.05, true)
+//                if (approxCurve.total() == 4L) {
+//                    maxArea = contourarea
+//                    maxAreaIdx = idx
+//                    largest_contours.add(temp_contour)
+//                    largest_contour = temp_contour
+//                }
+//            }
+//        }
+//        val temp_largest = largest_contours[largest_contours.size - 1]
+//        largest_contours = ArrayList()
+//        largest_contours.add(temp_largest)
+//        Imgproc.cvtColor(original_image, original_image, Imgproc.COLOR_BayerBG2RGB)
+//        Imgproc.drawContours(original_image, largest_contours, -1, Scalar(0, 255, 0), 1)
+//
+//        //create the new image here using the largest detected square
+//
+//        //Toast.makeText(getApplicationContext(), "Largest Contour: ", Toast.LENGTH_LONG).show();
+//        val bmpOut = Bitmap.createBitmap(
+//            original_image.cols(),
+//            original_image.rows(),
+//            Bitmap.Config.ARGB_8888
+//        )
+//        Utils.matToBitmap(original_image, bmpOut)
+//        try {
+//            bmpOut.compress(
+//                CompressFormat.JPEG,
+//                100,
+//                FileOutputStream("/sdcard/mediaAppPhotos/bigrect.jpg")
+//            )
+//        } catch (e: FileNotFoundException) {
+//            // TODO Auto-generated catch block
+//            e.printStackTrace()
+//        }
+//        return original_image
+//    }
+//
+//    private fun toBitmap(mat: Mat): Bitmap? {
+//        var bmp: Bitmap? = null
+//        val tmp = Mat(mat.height(), mat.width(), CvType.CV_8U, Scalar(4.0))
+//        try {
+//            //Imgproc.cvtColor(seedsImage, tmp, Imgproc.COLOR_RGB2BGRA);
+//            Imgproc.cvtColor(mat, tmp, Imgproc.COLOR_GRAY2RGBA, 4)
+//            bmp = Bitmap.createBitmap(tmp.cols(), tmp.rows(), Bitmap.Config.ARGB_8888)
+//            Utils.matToBitmap(tmp, bmp)
+//        } catch (e: CvException) {
+//            Log.d("Exception", e.message!!)
+//        }
+//        return bmp
+    }
+
+    private fun toBitmap(mat: Mat): Bitmap? {
+        var bmp: Bitmap? = null
+        val tmp = Mat(mat.height(), mat.width(), CvType.CV_8U, Scalar(4.0))
+        try {
+            //Imgproc.cvtColor(seedsImage, tmp, Imgproc.COLOR_RGB2BGRA);
+            Imgproc.cvtColor(mat, tmp, Imgproc.COLOR_GRAY2RGBA, 4)
+            bmp = Bitmap.createBitmap(tmp.cols(), tmp.rows(), Bitmap.Config.ARGB_8888)
+            Utils.matToBitmap(tmp, bmp)
+        } catch (e: CvException) {
+            Log.d("Exception", e.message!!)
         }
+        return bmp
+    }
+
+    private fun toMat(croppedBitmap: Bitmap): Mat {
+        val mat = Mat()
+        val bmp32: Bitmap = croppedBitmap.copy(Bitmap.Config.ARGB_8888, true)
+        Utils.bitmapToMat(bmp32, mat)
+        // return Mat (croppedBitmap.height, croppedBitmap.width, CvType.CV_8UC1)
+        return mat
     }
 
     private fun recognizeTextOnDevice(

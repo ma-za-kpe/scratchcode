@@ -1,7 +1,9 @@
 package com.maku.scratchcode.ui.screen
 
 import android.annotation.SuppressLint
+import android.graphics.Bitmap
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -31,6 +34,7 @@ import com.maku.scratchcode.ui.components.OverlayLoadingWheel
 fun ScratchCodeApp(
     shouldShowCamera: MutableState<Boolean>,
     shouldShowProcessing: MutableState<Boolean>,
+    bitmap: MutableState<Bitmap?>,
 ) {
     val online by remember { mutableStateOf(true) }
     Scaffold(
@@ -74,37 +78,44 @@ fun ScratchCodeApp(
                 AnimatedVisibility(
                     visible = shouldShowProcessing.value,
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .wrapContentHeight()
-                            .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.background)
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(
-                            text = "Processing ...",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.Black
-                        )
-                        AnimatedVisibility(
-                            visible = shouldShowProcessing.value,
+                    Column() {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .wrapContentHeight()
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.background)
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
-                            val loadingContentDescription = stringResource(R.string.app_name)
-                            Box(
-                                modifier = Modifier.size(70.dp)
+                            Text(
+                                text = "Processing ...",
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.Black
+                            )
+                            AnimatedVisibility(
+                                visible = shouldShowProcessing.value,
                             ) {
-                                OverlayLoadingWheel(
-                                    modifier = Modifier
-                                        .align(Alignment.Center)
-                                        .size(70.dp)
-                                        .padding(5.dp),
-                                    contentDesc = loadingContentDescription
-                                )
+                                val loadingContentDescription = stringResource(R.string.app_name)
+                                Box(
+                                    modifier = Modifier.size(70.dp)
+                                ) {
+                                    OverlayLoadingWheel(
+                                        modifier = Modifier
+                                            .align(Alignment.Center)
+                                            .size(70.dp)
+                                            .padding(5.dp),
+                                        contentDesc = loadingContentDescription
+                                    )
+                                }
                             }
                         }
+                        Image(
+                            bitmap = bitmap.value!!.asImageBitmap(),
+                            contentDescription = "Cat",
+                            modifier = Modifier.wrapContentHeight()
+                        )
                     }
                 }
             }
@@ -148,6 +159,7 @@ fun ListRow(model: ScratchEntity) {
 fun ScratchCodeAppPreview() {
     val shouldShowCamera: MutableState<Boolean> = mutableStateOf(false)
     val shouldShowProcessing: MutableState<Boolean> = mutableStateOf(true)
+    val bitmap = remember { mutableStateOf<Bitmap?>(null) }
 
-    ScratchCodeApp(shouldShowCamera, shouldShowProcessing)
+    ScratchCodeApp(shouldShowCamera, shouldShowProcessing, bitmap)
 }

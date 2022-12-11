@@ -9,7 +9,7 @@ android {
     defaultConfig {
         applicationId "com.maku.scratchcode"
         minSdk 21
-        targetSdk 32
+        targetSdk 33
         versionCode 1
         versionName "1.0"
 
@@ -52,9 +52,19 @@ android {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
         }
     }
+    sourceSets {
+        main {
+            jni {
+                srcDirs 'src\\main\\jni', 'src\\main\\jniLibs'
+            }
+        }
+    }
 }
 
 dependencies {
+
+    // opencv
+    implementation 'com.quickbirdstudios:opencv:3.4.15'
 
     // ML
     implementation 'com.google.android.gms:play-services-mlkit-text-recognition:18.0.2'
