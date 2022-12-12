@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.graphics.*
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
@@ -44,14 +45,16 @@ import com.maku.scratchcode.ui.screen.ScratchCodeApp
 import com.maku.scratchcode.ui.theme.ScratchCodeTheme
 import com.maku.scratchcode.ui.vm.MainViewModel
 import org.opencv.android.OpenCVLoader
+import org.opencv.android.Utils
+import org.opencv.core.*
+import org.opencv.core.CvType.CV_8UC3
+import org.opencv.core.Point
+import org.opencv.imgproc.Imgproc
 import java.io.File
+import java.util.*
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import kotlin.math.abs
-import kotlin.math.ln
-import kotlin.math.max
-import kotlin.math.min
 import androidx.camera.core.Preview as Pr
 
 
@@ -74,6 +77,7 @@ class MainActivity : ComponentActivity() {
 
     private var shouldShowCamera: MutableState<Boolean> = mutableStateOf(false)
     private var shouldShowProcessing: MutableState<Boolean> = mutableStateOf(false)
+    private var imgBitmap: MutableState<Bitmap?> = mutableStateOf(null)
 
     private val viewModel: MainViewModel by viewModels()
 
@@ -94,13 +98,11 @@ class MainActivity : ComponentActivity() {
         overlay = root.findViewById(R.id.overlay)
 
         if (!OpenCVLoader.initDebug())
-            Log.e("OpenCV", "Unable to load OpenCV!");
+            Log.e("OpenCV", "Unable to load OpenCV!")
         else
-            Log.d("OpenCV", "OpenCV loaded Successfully!");
+            Log.d("OpenCV", "OpenCV loaded Successfully!")
 
         setContent {
-            val bitmap = remember { mutableStateOf<Bitmap?>(null) }
-
             ScratchCodeTheme {
                 if (shouldShowCamera.value) {
                     CameraView(
@@ -110,11 +112,10 @@ class MainActivity : ComponentActivity() {
                         onError = { Log.e("Scratch", "View error:", it) },
                         shouldShowProcessing,
                         overlay,
-                        viewModel.imageCropPercentages,
-                        bitmap
+                        viewModel.imageCropPercentages
                     )
                 } else {
-                    ScratchCodeApp(shouldShowCamera, shouldShowProcessing, bitmap)
+                    ScratchCodeApp(shouldShowCamera, shouldShowProcessing, imgBitmap)
                 }
             }
         }
@@ -145,9 +146,158 @@ class MainActivity : ComponentActivity() {
         Log.i("Scratch", "Image captured: $uri")
         shouldShowCamera.value = false
         shouldShowProcessing.value = true
-        val bitmap: Bitmap =
-            MediaStore.Images.Media.getBitmap(this.contentResolver, Uri.parse(uri.toString()));
+        val img: Bitmap =
+            MediaStore.Images.Media.getBitmap(this.contentResolver, Uri.parse(uri.toString()))
         // runTextRecognition(bitmap, shouldShowProcessing)
+        cleanImage(img, shouldShowProcessing, imgBitmap)
+    }
+
+    private fun cleanImage(
+        img: Bitmap,
+        shouldShowProcessing: MutableState<Boolean>,
+        imgBitmap: MutableState<Bitmap?>
+    ) {
+        imgBitmap.value = img
+        imgBitmap.value = findRoi(img)
+//        val original = toMat(img)
+        // gray
+//        val gray8 = Mat(toMat(img).size(), CvType.CV_8UC1)
+//        Imgproc.cvtColor(toMat(img), gray8, Imgproc.COLOR_RGB2GRAY)
+//        imgBitmap.value = toBitmap(gray8)
+
+        // threshold
+//        val threshImageMat = Mat()
+//        Imgproc.threshold(gray8, threshImageMat, 0.0, 255.0, Imgproc.THRESH_OTSU)
+//        imgBitmap.value = toBitmap(threshImageMat)
+
+        // structural elements
+//        val structuralElement = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(18.0, 18.0))
+
+        // Applying dilation on the threshold image
+//        Imgproc.dilate(
+//            threshImageMat, structuralElement, Imgproc.getStructuringElement(
+//                Imgproc.MORPH_RECT, Size(
+//                    2.0, 2.0
+//                )
+//            )
+//        )
+
+        //find the contours
+//        val contours: List<MatOfPoint> = ArrayList()
+//        val hierarchy = Mat(threshImageMat.height(), threshImageMat.width(), CvType.CV_8UC1)
+//
+//        Imgproc.findContours(
+//            threshImageMat,
+//            contours,
+//            hierarchy,
+//            Imgproc.RETR_LIST,
+//            Imgproc.CHAIN_APPROX_SIMPLE
+//        )
+
+        // new MAT to draw contours on
+//        val newMat = Mat()
+//        newMat.create(threshImageMat.rows(), threshImageMat.cols(), CvType.CV_8UC3)
+//        val r = Random()
+
+        //Drawing the Contours
+//        val color = Scalar(0.0, 0.0, 255.0)
+//        Imgproc.drawContours(
+//            original, contours, -1, color, 2, Imgproc.LINE_8,
+//            hierarchy, 2, Point()
+//        )
+
+//        for (i in contours.indices) {
+//            Imgproc.drawContours(
+//                newMat, contours, i, Scalar(
+//                    r.nextInt(255).toDouble(),
+//                    r.nextInt(255).toDouble(), r.nextInt(255).toDouble()
+//                ), -1
+//            )
+//        }
+
+//        for (contourIdx in contours.indices) {
+//            Imgproc.drawContours(
+//                original, contours, contourIdx, Scalar(0.0, 0.0, 255.0), -1
+//            )
+//        }
+//
+//        val bmpContour = Bitmap.createBitmap(original.width(), original.height(), Bitmap.Config.ARGB_8888)
+//        Utils.matToBitmap(threshImageMat, bmpContour)
+//        imgBitmap.value = bmpContour
+
+    }
+
+    private fun findRoi(sourceBitmap: Bitmap): Bitmap? {
+        // source
+        val sourceMat = Mat(sourceBitmap.width, sourceBitmap.height, CV_8UC3)
+        Utils.bitmapToMat(sourceBitmap, sourceMat)
+
+        // gray
+        val grayMat = Mat(sourceBitmap.width, sourceBitmap.height, CV_8UC3)
+        Imgproc.cvtColor(sourceMat, grayMat, Imgproc.COLOR_BGR2GRAY)
+
+        // threshold
+        Imgproc.threshold(grayMat, grayMat, 125.0, 200.0, Imgproc.THRESH_BINARY+Imgproc.THRESH_OTSU)
+
+//        // find contours
+//        val whiteContours: List<MatOfPoint> = ArrayList()
+//        var largestRect: Rect? = null
+//        Imgproc.findContours(
+//            grayMat,
+//            whiteContours,
+//            Mat(),
+//            Imgproc.RETR_LIST,
+//            Imgproc.CHAIN_APPROX_SIMPLE
+//        )
+//
+//        // find appropriate bounding rectangles
+//        for (contour in whiteContours) {
+//            val boundingRect = Imgproc.minAreaRect(MatOfPoint2f(*contour.toArray()))
+//            val rectangleArea = boundingRect.size.area()
+//
+//            // test min ROI area in pixels
+//            if (rectangleArea > 10000) {
+//                val rotated_rect_points = arrayOfNulls<Point>(4)
+//                boundingRect.points(rotated_rect_points)
+//                val rect: Rect = Imgproc.boundingRect(MatOfPoint(*rotated_rect_points))
+//
+//                // test horizontal ROI orientation and aspect ratio
+//                if (rect.width() > 3 * rect.height()) {
+//                    if (largestRect == null) {
+//                        largestRect = rect
+//                    } else {
+//                        if (rect.width() > largestRect.width()) {
+//                            largestRect = rect
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//        val roiMat = Mat(sourceMat, largestRect)
+        val bitmap = Bitmap.createBitmap(grayMat.cols(), grayMat.rows(), Bitmap.Config.ARGB_8888)
+        Utils.matToBitmap(grayMat, bitmap)
+        return bitmap
+    }
+
+    fun toMat(croppedBitmap: Bitmap): Mat {
+        val mat = Mat()
+        val bmp32: Bitmap = croppedBitmap.copy(Bitmap.Config.ARGB_8888, true)
+        Utils.bitmapToMat(bmp32, mat)
+        return mat
+    }
+
+    fun toBitmap(mat: Mat): Bitmap? {
+        var bmp: Bitmap? = null
+        val tmp = Mat(mat.height(), mat.width(), CvType.CV_8U, Scalar(4.0))
+        try {
+            //Imgproc.cvtColor(seedsImage, tmp, Imgproc.COLOR_RGB2BGRA);
+            Imgproc.cvtColor(mat, tmp, Imgproc.COLOR_GRAY2RGBA, 4)
+            bmp = Bitmap.createBitmap(tmp.cols(), tmp.rows(), Bitmap.Config.ARGB_8888)
+            Utils.matToBitmap(tmp, bmp)
+        } catch (e: CvException) {
+            Log.d("Exception", e.message!!)
+        }
+        return bmp
     }
 
     private fun getOutputDirectory(): File {
@@ -174,7 +324,6 @@ fun CameraView(
     shouldShowProcessing: MutableState<Boolean>,
     overlay: SurfaceView,
     imageCropPercentages: MutableLiveData<Pair<Int, Int>>,
-    bitmap: MutableState<Bitmap?>
 ) {
 
     val lensFacing = CameraSelector.LENS_FACING_BACK
@@ -183,12 +332,6 @@ fun CameraView(
 
     val preview = Pr.Builder().build()
     val previewView = remember { PreviewView(context) }
-    // Get screen metrics used to setup camera for full screen resolution
-    // val metrics = DisplayMetrics().also { previewView.display.getRealMetrics(it) }
-    // Log.d("TAG", "Screen metrics: ${metrics.widthPixels} x ${metrics.heightPixels}")
-    // val screenAspectRatio = aspectRatio(metrics.widthPixels, metrics.heightPixels)
-    // Log.d("TAG", "Preview aspect ratio: $screenAspectRatio")
-    // val rotation = previewView.display.rotation
 
     val imageCapture: ImageCapture = remember { ImageCapture.Builder().build() }
     val cameraSelector = CameraSelector.Builder()
@@ -196,15 +339,12 @@ fun CameraView(
         .build()
     val imageAnalyzer = remember {
         ImageAnalysis.Builder()
-            // We request aspect ratio but no resolution
-            // .setTargetAspectRatio(screenAspectRatio)
-            // .setTargetRotation(rotation)
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .build()
             .also {
                 it.setAnalyzer(
                     executor,
-                    TextAnalyzer(shouldShowProcessing, imageCropPercentages, bitmap)
+                    TextAnalyzer(shouldShowProcessing, imageCropPercentages)
                 )
             }
     }
@@ -219,9 +359,7 @@ fun CameraView(
             imageCapture,
             imageAnalyzer
         )
-
         preview.setSurfaceProvider(previewView.surfaceProvider)
-        // previewView.overlay
     }
 
     ImagePreview(
@@ -235,16 +373,6 @@ fun CameraView(
         shouldShowProcessing
     )
 
-}
-
-fun aspectRatio(width: Int, height: Int): Int {
-    val previewRatio = ln(max(width, height).toDouble() / min(width, height))
-    if (abs(previewRatio - ln(RATIO_4_3_VALUE))
-        <= abs(previewRatio - ln(RATIO_16_9_VALUE))
-    ) {
-        return AspectRatio.RATIO_4_3
-    }
-    return AspectRatio.RATIO_16_9
 }
 
 @Composable
@@ -289,7 +417,7 @@ fun ImagePreview(
                         override fun surfaceDestroyed(holder: SurfaceHolder) {}
 
                         override fun surfaceCreated(holder: SurfaceHolder) {
-                            holder?.let {
+                            holder.let {
                                 drawOverlay(
                                     it,
                                     DESIRED_HEIGHT_CROP_PERCENT,

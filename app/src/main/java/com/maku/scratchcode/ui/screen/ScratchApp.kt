@@ -2,6 +2,7 @@ package com.maku.scratchcode.ui.screen
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -111,11 +112,15 @@ fun ScratchCodeApp(
                                 }
                             }
                         }
-                        Image(
-                            bitmap = bitmap.value!!.asImageBitmap(),
-                            contentDescription = "Cat",
-                            modifier = Modifier.wrapContentHeight()
-                        )
+                        if (bitmap.value?.asImageBitmap() == null){
+                            Log.d("TAG", "ScratchCodeApp: null")
+                        } else {
+                            Image(
+                                bitmap = bitmap.value!!.asImageBitmap(),
+                                contentDescription = "Cat",
+                                modifier = Modifier.wrapContentHeight()
+                            )
+                        }
                     }
                 }
             }
