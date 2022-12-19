@@ -19,6 +19,7 @@ import androidx.camera.core.*
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -101,7 +102,9 @@ class MainActivity : ComponentActivity() {
             Log.e("OpenCV", "Unable to load OpenCV!")
         else
             Log.d("OpenCV", "OpenCV loaded Successfully!")
-
+        // Turn off the decor fitting system windows, which allows us to handle insets,
+        // including IME animations
+        // WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent {
             ScratchCodeTheme {
                 if (shouldShowCamera.value) {
@@ -158,7 +161,7 @@ class MainActivity : ComponentActivity() {
         imgBitmap: MutableState<Bitmap?>
     ) {
         imgBitmap.value = img
-        imgBitmap.value = findRoi(img)
+        findRoi(img, imgBitmap)
 //        val original = toMat(img)
         // gray
 //        val gray8 = Mat(toMat(img).size(), CvType.CV_8UC1)
@@ -227,56 +230,72 @@ class MainActivity : ComponentActivity() {
 
     }
 
-    private fun findRoi(sourceBitmap: Bitmap): Bitmap? {
+    private fun findRoi(sourceBitmap: Bitmap, bit: MutableState<Bitmap?>) {
         // source
         val sourceMat = Mat(sourceBitmap.width, sourceBitmap.height, CV_8UC3)
         Utils.bitmapToMat(sourceBitmap, sourceMat)
+        bit.value = toBitmap(sourceMat)
 
         // gray
         val grayMat = Mat(sourceBitmap.width, sourceBitmap.height, CV_8UC3)
         Imgproc.cvtColor(sourceMat, grayMat, Imgproc.COLOR_BGR2GRAY)
+        bit.value = toBitmap(grayMat)
+
+//        // structural elements
+//        val rectStructuralElement = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(10.0, 5.0))
+//
+//        // Morphological operations
+//        val morphologyExMat: Mat = grayMat.clone()
+//        Imgproc.morphologyEx(grayMat, morphologyExMat, Imgproc.MORPH_BLACKHAT, rectStructuralElement)
+//        bit.value = toBitmap(morphologyExMat)
+//
+//        // structural elements
+//        val sqrStructuralElement = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(3.0, 3.0))
+//
+//        // Morphological operations
+//        val morphologyExClose: Mat = morphologyExMat.clone()
+//        Imgproc.morphologyEx(morphologyExMat, morphologyExClose, Imgproc.MORPH_CLOSE, sqrStructuralElement)
+//        bit.value = toBitmap(morphologyExClose)
+
+
+        // (OPTION 1) bilateral filter : Reducing the noise in the greyscale image
+//        val bilateralMat: Mat = grayMat.clone()
+//        Imgproc.bilateralFilter(grayMat, bilateralMat, 5, 10.0, 10.0)
+//        bit.value = toBitmap(bilateralMat)
+
+         // (OPTION 2) GaussianBlur filter : Reducing the noise in the greyscale image
+        val gaussianMat: Mat = grayMat.clone()
+        Imgproc.GaussianBlur(grayMat, gaussianMat, Size(5.0, 5.0), 0.0, 0.0)
+        bit.value = toBitmap(gaussianMat)
+//
+//        // canny
+//        val cannyMat: Mat = grayMat.clone()
+//        Imgproc.Canny(gaussianMat, cannyMat, 50.0, 100.0);
+//        bit.value = toBitmap(cannyMat)
 
         // threshold
-        Imgproc.threshold(grayMat, grayMat, 125.0, 200.0, Imgproc.THRESH_BINARY+Imgproc.THRESH_OTSU)
+        val thresholdMat: Mat = gaussianMat.clone()
+        Imgproc.threshold(gaussianMat, thresholdMat, 0.0, 255.0, Imgproc.THRESH_BINARY+Imgproc.THRESH_OTSU)
+        bit.value = toBitmap(thresholdMat)
 
-//        // find contours
-//        val whiteContours: List<MatOfPoint> = ArrayList()
-//        var largestRect: Rect? = null
-//        Imgproc.findContours(
-//            grayMat,
-//            whiteContours,
-//            Mat(),
-//            Imgproc.RETR_LIST,
-//            Imgproc.CHAIN_APPROX_SIMPLE
-//        )
-//
-//        // find appropriate bounding rectangles
-//        for (contour in whiteContours) {
-//            val boundingRect = Imgproc.minAreaRect(MatOfPoint2f(*contour.toArray()))
-//            val rectangleArea = boundingRect.size.area()
-//
-//            // test min ROI area in pixels
-//            if (rectangleArea > 10000) {
-//                val rotated_rect_points = arrayOfNulls<Point>(4)
-//                boundingRect.points(rotated_rect_points)
-//                val rect: Rect = Imgproc.boundingRect(MatOfPoint(*rotated_rect_points))
-//
-//                // test horizontal ROI orientation and aspect ratio
-//                if (rect.width() > 3 * rect.height()) {
-//                    if (largestRect == null) {
-//                        largestRect = rect
-//                    } else {
-//                        if (rect.width() > largestRect.width()) {
-//                            largestRect = rect
-//                        }
-//                    }
-//                }
-//            }
-//        }
-//        val roiMat = Mat(sourceMat, largestRect)
-        val bitmap = Bitmap.createBitmap(grayMat.cols(), grayMat.rows(), Bitmap.Config.ARGB_8888)
-        Utils.matToBitmap(grayMat, bitmap)
-        return bitmap
+       // find contours
+        val contours: List<MatOfPoint> = ArrayList()
+        val hierarchey = Mat()
+        Imgproc.findContours(
+            thresholdMat, contours, hierarchey, Imgproc.RETR_TREE,
+            Imgproc.CHAIN_APPROX_SIMPLE
+        )
+
+        //Drawing the Contours
+        val color = Scalar(0.0, 0.0, 255.0)
+        Imgproc.drawContours(
+            sourceMat, contours, -1, color, 2, Imgproc.LINE_8,
+            hierarchey, 2, Point()
+        )
+
+        val bitmap = Bitmap.createBitmap(sourceMat.cols(), sourceMat.rows(), Bitmap.Config.ARGB_8888)
+        Utils.matToBitmap(sourceMat, bitmap)
+        bit.value = bitmap
     }
 
     fun toMat(croppedBitmap: Bitmap): Mat {
@@ -386,6 +405,14 @@ fun ImagePreview(
     onError: (ImageCaptureException) -> Unit,
     shouldShowProcessing: MutableState<Boolean>
 ) {
+//    val systemUiController = rememberSystemUiController()
+//    SideEffect {
+//        // set transparent color so that our image is visible
+//        // under the status bar
+//        systemUiController.setStatusBarColor(
+//            color = Color.Transparent
+//        )
+//    }
     ConstraintLayout(modifier = Modifier.fillMaxSize()) {
         val (preview, box, button) = createRefs()
         AndroidView(
@@ -395,9 +422,10 @@ fun ImagePreview(
                     top.linkTo(parent.top)
                     start.linkTo(parent.start)
                     end.linkTo(parent.end)
-                    bottom.linkTo(parent.bottom)
+                    bottom.linkTo(button.top, 4.dp)
                 }
-                .fillMaxSize())
+
+        )
 
         // widget.SurfaceView
         AndroidView(
@@ -429,11 +457,14 @@ fun ImagePreview(
                 }
             },
             Modifier
+                .height(420.dp)
                 .constrainAs(box) {
                     top.linkTo(preview.top)
                     start.linkTo(preview.start)
                     end.linkTo(preview.end)
                     bottom.linkTo(preview.bottom)
+//                    width = Dimension.fillToConstraints
+//                    height = Dimension.matchParent
                 }, update = {
                 // Update TextView with the current state value
                 // it.text = "You have clicked the buttons: " + state.value.toString() + " times"
@@ -442,11 +473,11 @@ fun ImagePreview(
         IconButton(
             modifier = Modifier
                 .constrainAs(button) {
-                    start.linkTo(box.start)
-                    end.linkTo(box.end)
-                    bottom.linkTo(box.bottom, 32.dp)
+                    start.linkTo(preview.start)
+                    end.linkTo(preview.end)
+                    bottom.linkTo(parent.bottom, 8.dp)
                 }
-                .padding(bottom = 20.dp),
+                .padding(bottom = 16.dp),
             onClick = {
                 Log.i("Scratch", "ON CLICK")
                 takePhoto(
@@ -463,11 +494,11 @@ fun ImagePreview(
                 Icon(
                     imageVector = Icons.Sharp.Lens,
                     contentDescription = "Take picture",
-                    tint = Color.White,
+                    tint = Color.Black,
                     modifier = Modifier
                         .size(100.dp)
                         .padding(1.dp)
-                        .border(1.dp, Color.White, CircleShape)
+                        .border(1.dp, Color.Black, CircleShape)
                 )
             }
         )
