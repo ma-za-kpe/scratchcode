@@ -48,6 +48,7 @@ import com.maku.scratchcode.ui.vm.MainViewModel
 import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
 import org.opencv.core.*
+import org.opencv.core.Core.FONT_HERSHEY_SIMPLEX
 import org.opencv.core.CvType.CV_8UC3
 import org.opencv.core.Point
 import org.opencv.imgproc.Imgproc
@@ -58,7 +59,6 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import androidx.camera.core.Preview as Pr
 
-
 typealias mlListener = (ml: ImageProxy) -> Unit
 
 // We only need to analyze the part of the image that has text, so we set crop percentages
@@ -68,7 +68,7 @@ const val DESIRED_HEIGHT_CROP_PERCENT = 74
 private const val RATIO_4_3_VALUE = 4.0 / 3.0
 private const val RATIO_16_9_VALUE = 16.0 / 9.0
 
-@androidx.camera.core.ExperimentalGetImage
+@ExperimentalGetImage
 class MainActivity : ComponentActivity() {
 
     private lateinit var overlay: SurfaceView
@@ -287,11 +287,77 @@ class MainActivity : ComponentActivity() {
         )
 
         //Drawing the Contours
-        val color = Scalar(0.0, 0.0, 255.0)
-        Imgproc.drawContours(
-            sourceMat, contours, -1, color, 2, Imgproc.LINE_8,
-            hierarchey, 2, Point()
-        )
+        val color = Scalar(0.0, 255.0, 0.0)
+//        Imgproc.drawContours(
+//            sourceMat, contours, -1, color, 8, Imgproc.LINE_8,
+//            hierarchey, 2, Point()
+//        )
+
+        var inf = 0.0
+        var max_rect: org.opencv.core.Rect? = null
+
+        for (i in contours.indices) {
+            val rect: org.opencv.core.Rect? = Imgproc.boundingRect(contours[i])
+
+            val area: Double = rect!!.area()
+
+            if(inf < area) {
+                max_rect = rect
+                inf = area
+                Log.d("TAG", "findRoi: inf < area, $max_rect")
+            }
+
+            if (area > 130000) {
+                Log.d("TAG", "findRoi: area > 50000 $area")
+                println(area)
+                Imgproc.rectangle(
+                    sourceMat, Point(rect.x.toDouble(), rect.y.toDouble()), Point(
+                        (rect.x + rect.width).toDouble(), (rect.y + rect.height).toDouble()
+                    ), color, 5
+                )
+
+                //Adding text to the image
+                val font: Int = FONT_HERSHEY_SIMPLEX
+                val scale = 5
+                val thickness = 5
+                Imgproc.putText(
+                    sourceMat,
+                    "$area",
+                    Point(rect.x.toDouble(), rect.y.toDouble()), font,
+                    scale.toDouble(), Scalar(255.0, 0.0, 0.0), thickness);
+            }
+        }
+
+//        val mMOP2f1 = MatOfPoint2f()
+//        val approxCurve = MatOfPoint2f()
+//
+//        //For each contour found
+//        for (i in contours.indices) {
+//            //Convert contours(i) from MatOfPoint to MatOfPoint2f
+//            //val contour2f = MatOfPoint2f(contours[i].toArray())
+//            contours[i].convertTo(mMOP2f1, CvType.CV_32FC2)
+//            //Processing on mMOP2f1 which is in type MatOfPoint2f
+//            val approxDistance = Imgproc.arcLength(mMOP2f1, true) * 0.02
+//            //Imgproc.approxPolyDP(contour2f, approxCurve, approxDistance, true)
+//            Imgproc.approxPolyDP(mMOP2f1, approxCurve, approxDistance, true);
+//            //Convert back to MatOfPoint
+//            //val points = MatOfPoint(approxCurve)
+//            approxCurve.convertTo(contours[i], CvType.CV_32S);
+//
+//            // Get bounding rect of contour
+//            val rect = Imgproc.boundingRect(approxCurve);
+//
+//            // draw enclosing rectangle (all same color, but you could use variable i to make them unique)
+//            rectangle(
+//                sourceMat,
+//                Point(rect.x.toDouble(), rect.y.toDouble()),
+//                Point(
+//                    (rect.x + rect.width).toDouble(),
+//                    (rect.y + rect.height).toDouble()
+//                ),
+//                color
+//            )
+//        }
 
         val bitmap = Bitmap.createBitmap(sourceMat.cols(), sourceMat.rows(), Bitmap.Config.ARGB_8888)
         Utils.matToBitmap(sourceMat, bitmap)
@@ -333,7 +399,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@androidx.camera.core.ExperimentalGetImage
+@ExperimentalGetImage
 @Composable
 fun CameraView(
     outputDirectory: File,
@@ -505,7 +571,7 @@ fun ImagePreview(
     }
 }
 
-@androidx.camera.core.ExperimentalGetImage
+@ExperimentalGetImage
 private class ScratchImageAnalyzer(private val listener: mlListener) : ImageAnalysis.Analyzer {
     override fun analyze(imageProxy: ImageProxy) {
         listener(imageProxy)
